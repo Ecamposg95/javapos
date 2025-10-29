@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataX POS - Caja</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <!-- Estilos personalizados -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Estilo para la barra de scroll del carrito */
+        #cart-items::-webkit-scrollbar {
+            width: 6px;
+        }
+        #cart-items::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #cart-items::-webkit-scrollbar-thumb {
+            background: #a8a8a8;
+            border-radius: 10px;
+        }
+        #cart-items::-webkit-scrollbar-thumb:hover {
+            background: #7a7a7a;
+        }
+        /* Clases para la animación del Toast */
+        .toast-enter {
+            opacity: 0;
+            transform: translateY(100%);
+        }
+        .toast-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 300ms, transform 300ms;
+        }
+        .toast-exit {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast-exit-active {
+            opacity: 0;
+            transform: translateY(100%);
+            transition: opacity 300ms, transform 300ms;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-full overflow-hidden">
+<div class="flex h-screen">
+
+    <!-- Panel Izquierdo (Búsqueda y Pedidos Pendientes) -->
+    <div class="w-2/5 bg-white p-6 shadow-lg flex flex-col">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">DataX POS</h1>
+
+        <!-- Buscador de Productos -->
+        <div>
+            <label for="search-product" class="block text-sm font-medium text-gray-700">Buscar Producto (SKU o Nombre)</label>
+            <div class="mt-1 flex rounded-md shadow-sm">
+                <input type="text" id="search-product" class="flex-1 block w-full rounded-none rounded-l-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Ej: 12345 o 'Tornillo'">
+                <button id="search-button" class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                    Buscar
+                </button>
+            </div>
+        </div>
+
+        <!-- Resultados de Búsqueda -->
+        <div id="search-results" class="mt-4 border border-gray-200 rounded-md h-64 overflow-y-auto bg-gray-50">
+            <!-- Los resultados se insertarán aquí -->
+        </div>
+
+        <!-- Pedidos Pendientes de Cobro -->
+        <div class="mt-6 flex-1 flex flex-col">
+            <h2 class="text-xl font-semibold text-gray-700">Pedidos Listos para Cobro</h2>
+            <div id="pending-orders" class="mt-3 border border-gray-200 rounded-md flex-1 overflow-y-auto">
+                <!-- Los pedidos pendientes se insertarán aquí -->
+            </div>
+            <button id="load-pending-button" class="mt-2 w-full text-sm rounded-md bg-gray-200 py-2 px-3 font-medium text-gray-700 hover:bg-gray-300">
+                Recargar Lista
+            </button>
+        </div>
+    </div>
+
+    <!-- Panel Derecho (Venta Actual / Carrito) -->
+    <div class="w-3/5 p-6 flex flex-col bg-gray-50">
+        <!-- Info del Pedido y Cliente -->
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-800">Venta Actual</h2>
+                <span id="order-id" class="text-sm text-gray-500">Folio: N/A</span>
+            </div>
+            <div class="w-1/2">
+                <label for="customer-name" class="block text-sm font-medium text-gray-700">Cliente</label>
+                <input type="text" id="customer-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Cliente de Mostrador">
+            </div>
+        </div>
+
+        <!-- Cabecera del Carrito -->
+        <div class="flex bg-gray-200 p-2 rounded-t-md text-sm font-semibold text-gray-600">
+            <span class="w-1/2">Producto</span>
+            <span class="w-1/4 text-center">Cantidad</span>
+            <span class="w-1/4 text-right">Importe</span>
+        </div>
+
+        <!-- Lista de Items del Carrito -->
+        <div id="cart-items" class="flex-1 bg-white shadow-inner overflow-y-auto border-l border-r border-b border-gray-200">
+            <!-- Items del carrito se insertarán aquí -->
+            <p id="cart-empty" class="text-gray-500 text-center p-10">El carrito está vacío.</p>
+        </div>
+
+        <!-- Totales -->
+        <div class="bg-white p-4 mt-4 rounded-md shadow-md border border-gray-200">
+            <div class="flex justify-between text-lg">
+                <span class="text-gray-600">Subtotal</span>
+                <span id="cart-subtotal" class="font-medium text-gray-800">$0.00</span>
+            </div>
+            <div class="flex justify-between text-lg mt-1">
+                <span class="text-gray-600">Impuestos (IVA 16%)</span>
+                <span id="cart-tax" class="font-medium text-gray-800">$0.00</span>
+            </div>
+            <div class="flex justify-between text-2xl font-bold mt-2 pt-2 border-t">
+                <span class="text-gray-900">Total</span>
+                <span id="cart-total" class="text-indigo-600">$0.00</span>
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="mt-4 grid grid-cols-3 gap-4">
+            <button id="new-order-button" class="rounded-md bg-indigo-600 py-3 px-4 text-lg font-semibold text-white shadow-sm hover:bg-indigo-700">
+                Nueva Venta
+            </button>
+            <button id="ready-order-button" class="rounded-md bg-yellow-500 py-3 px-4 text-lg font-semibold text-white shadow-sm hover:bg-yellow-600" disabled>
+                A Cobro
+            </button>
+            <button id="pay-order-button" class="rounded-md bg-green-600 py-3 px-4 text-lg font-semibold text-white shadow-sm hover:bg-green-700" disabled>
+                Cobrar
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Pago -->
+    <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+            <h3 class="text-2xl font-bold text-gray-900">Procesar Pago</h3>
+            <div class="mt-4">
+                <span class="text-lg text-gray-600">Total a Pagar:</span>
+                <span id="modal-total" class="text-3xl font-bold text-indigo-600 ml-2">$0.00</span>
+            </div>
+
+            <div class="mt-6">
+                <label for="payment-method" class="block text-sm font-medium text-gray-700">Método de Pago</label>
+                <select id="payment-method" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-lg">
+                    <option value="EFECTIVO">Efectivo</option>
+                    <option value="TARJETA">Tarjeta</option>
+                    <option value="TRANSFERENCIA">Transferencia</option>
+                </select>
+            </div>
+
+            <div class="mt-4">
+                <label for="amount-received" class="block text-sm font-medium text-gray-700">Monto Recibido</label>
+                <input type="number" id="amount-received" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-lg" placeholder="0.00">
+            </div>
+
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="cancel-payment-button" class="rounded-md bg-gray-200 py-2 px-5 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-300">
+                    Cancelar
+                </button>
+                <button id="confirm-payment-button" class="rounded-md bg-green-600 py-2 px-5 text-sm font-semibold text-white shadow-sm hover:bg-green-700">
+                    Confirmar Pago
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Cambio (Vuelto) -->
+    <div id="change-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md text-center">
+            <h3 class="text-2xl font-bold text-gray-900">Pago Exitoso</h3>
+            <p class="text-lg text-gray-600 mt-4">Cambio a devolver:</p>
+            <p id="change-amount" class="text-6xl font-extrabold text-indigo-600 my-6">$0.00</p>
+            <button id="close-change-modal-button" class="w-full rounded-md bg-indigo-600 py-3 px-5 text-lg font-semibold text-white shadow-sm hover:bg-indigo-700">
+                Aceptar (Nueva Venta)
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Contenedor del Toast (Notificación) -->
+<div id="toast" class="fixed bottom-5 right-5 w-80 rounded-md shadow-lg p-4 transition-all duration-300 ease-in-out toast-enter">
+    <p id="toast-message" class="text-sm font-medium"></p>
+</div>
+
+<script>
+    // === ESTADO GLOBAL DE LA APLICACIÓN ===
+    const state = {
+        currentOrder: null, // Objeto OrderDTO de la venta activa
+        searchResults: [],  // Array de ProductSearchResultDTO
+        pendingOrders: [],  // Array de OrderDTO
+    };
+
+    // IDs hardcodeados (en un app real vendrían del login)
+    const CURRENT_BRANCH_ID = 1;
+    const CURRENT_CASHIER_ID = 1;
+
+    // === SELECTORES DE ELEMENTOS DEL DOM ===
+    const searchInput = document.getElementById('search-product');
+    const searchButton = document.getElementById('search-button');
+    const searchResultsContainer = document.getElementById('search-results');
+    const pendingOrdersContainer = document.getElementById('pending-orders');
+    const loadPendingButton = document.getElementById('load-pending-button');
+
+    const cartItemsContainer = document.getElementById('cart-items');
+    const cartEmptyMessage = document.getElementById('cart-empty');
+    const orderIdSpan = document.getElementById('order-id');
+    const customerNameInput = document.getElementById('customer-name');
+
+    const subtotalSpan = document.getElementById('cart-subtotal');
+    const taxSpan = document.getElementById('cart-tax');
+    const totalSpan = document.getElementById('cart-total');
+
+    const newOrderButton = document.getElementById('new-order-button');
+    const readyOrderButton = document.getElementById('ready-order-button');
+    const payOrderButton = document.getElementById('pay-order-button');
+
+    const paymentModal = document.getElementById('payment-modal');
+    const modalTotalSpan = document.getElementById('modal-total');
+    const paymentMethodSelect = document.getElementById('payment-method');
+    const amountReceivedInput = document.getElementById('amount-received');
+    const cancelPaymentButton = document.getElementById('cancel-payment-button');
+    const confirmPaymentButton = document.getElementById('confirm-payment-button');
+
+    const changeModal = document.getElementById('change-modal');
+    const changeAmountSpan = document.getElementById('change-amount');
+    const closeChangeModalButton = document.getElementById('close-change-modal-button');
+
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+
+    // === LÓGICA DE API (Fetch) ===
+
+    /**
+     * Muestra una notificación (toast) en pantalla.
+     */
+    function showToast(message, isError = false) {
+        toastMessage.textContent = message;
+        if (isError) {
+            toast.classList.remove('bg-green-500');
+            toast.classList.add('bg-red-500', 'text-white');
+        } else {
+            toast.classList.remove('bg-red-500', 'text-white');
+            toast.classList.add('bg-green-500', 'text-white');
+        }
+
+        toast.classList.remove('toast-exit', 'toast-exit-active');
+        toast.classList.add('toast-enter-active');
+        toast.classList.remove('toast-enter');
+
+        setTimeout(() => {
+            toast.classList.add('toast-exit-active');
+            toast.classList.remove('toast-enter-active');
+            toast.classList.add('toast-exit');
+        }, 3000);
+    }
+
+    /**
+     * Formatea un número a moneda (ej. 123.4 a $123.40)
+     */
+    function formatCurrency(amount) {
+        if (typeof amount !== 'number') {
+            amount = parseFloat(amount) || 0;
+        }
+        return amount.toLocaleString('es-MX', {
+            style: 'currency',
+            currency: 'MXN',
+        });
+    }
+
+    /**
+     * Manejador genérico de errores de fetch
+     */
+    async function handleApiError(response, customMessage) {
+        const errorData = await response.json();
+        const message = errorData.message || customMessage || 'Ocurrió un error en el servidor';
+        console.error('API Error:', message, errorData);
+        showToast(message, true);
+    }
+
+    /**
+     * Busca productos en el backend.
+     * GET /api/products/search?q=...
+     */
+    async function searchProducts(query) {
+        if (!query) {
+            state.searchResults = [];
+            renderSearchResults();
+            return;
+        }
+        try {
+            const response = await fetch(`/api/products/search?q=${encodeURIComponent(query)}`);
+            if (!response.ok) {
+                await handleApiError(response, 'Error al buscar productos');
+                return;
+            }
+            state.searchResults = await response.json();
+            renderSearchResults();
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al buscar productos.', true);
+        }
+    }
+
+    /**
+     * Carga los pedidos pendientes de cobro.
+     * GET /api/orders?branchId=1&status=READY_TO_PAY
+     */
+    async function loadPendingOrders() {
+        try {
+            const response = await fetch(`/api/orders?branchId=${CURRENT_BRANCH_ID}&status=READY_TO_PAY`);
+            if (!response.ok) {
+                await handleApiError(response, 'Error al cargar pedidos pendientes');
+                return;
+            }
+            state.pendingOrders = await response.json();
+            renderPendingOrders();
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al cargar pedidos.', true);
+        }
+    }
+
+    /**
+     * Carga una orden específica (pendiente o para continuar).
+     * GET /api/orders/{orderId}
+     */
+    async function loadOrder(orderId) {
+        try {
+            const response = await fetch(`/api/orders/${orderId}`);
+            if (!response.ok) {
+                await handleApiError(response, 'Error al cargar la orden');
+                return;
+            }
+            state.currentOrder = await response.json();
+            renderCart();
+            updateUIState();
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al cargar la orden.', true);
+        }
+    }
+
+    /**
+     * Crea una nueva "Venta Rápida".
+     * POST /api/orders/quick
+     */
+    async function createNewOrder() {
+        try {
+            const requestBody = {
+                branchId: CURRENT_BRANCH_ID,
+                cashierId: CURRENT_CASHIER_ID, // El backend lo usará como 'seller' si es DRAFT
+                customerName: "Cliente de Mostrador"
+            };
+
+            const response = await fetch('/api/orders/quick', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, 'Error al crear la orden');
+                return;
+            }
+            state.currentOrder = await response.json();
+            renderCart();
+            updateUIState();
+            customerNameInput.value = state.currentOrder.customerName;
+            showToast('Nueva venta iniciada.');
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al crear la orden.', true);
+        }
+    }
+
+    /**
+     * Añade un producto al carrito (orden actual).
+     * POST /api/orders/{orderId}/items
+     */
+    async function addItemToCart(product) {
+        if (!state.currentOrder) {
+            showToast('Inicia una "Nueva Venta" antes de añadir productos.', true);
+            return;
+        }
+
+        try {
+            const requestBody = {
+                productId: product.productId,
+                sku: product.sku,
+                quantity: 1.0 // Añadimos de 1 en 1
+            };
+
+            const response = await fetch(`/api/orders/${state.currentOrder.id}/items`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, 'Error al añadir el producto');
+                return;
+            }
+            // El backend recalcula todo y devuelve la orden actualizada
+            state.currentOrder = await response.json();
+            renderCart();
+            updateUIState();
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al añadir producto.', true);
+        }
+    }
+
+    /**
+     * Elimina un ítem del carrito (orden actual).
+     * DELETE /api/orders/{orderId}/items/{orderItemId}
+     */
+    async function removeItemFromCart(orderItemId) {
+        if (!state.currentOrder) return;
+
+        try {
+            const response = await fetch(`/api/orders/${state.currentOrder.id}/items/${orderItemId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, 'Error al eliminar el producto');
+                return;
+            }
+            // El backend recalcula todo y devuelve la orden actualizada
+            state.currentOrder = await response.json();
+            renderCart();
+            updateUIState();
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al eliminar producto.', true);
+        }
+    }
+
+    /**
+     * Actualiza el nombre del cliente en la orden.
+     * PUT /api/orders/{orderId}/customer
+     */
+    async function updateCustomerName(orderId, newName) {
+        if (!orderId) return;
+        try {
+            const response = await fetch(`/api/orders/${orderId}/customer`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customerName: newName })
+            });
+            if (!response.ok) {
+                await handleApiError(response, 'Error al actualizar el cliente');
+            } else {
+                state.currentOrder = await response.json();
+                showToast('Cliente actualizado.');
+            }
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al actualizar cliente.', true);
+        }
+    }
+
+    /**
+     * Marca la orden como "Lista para Cobro".
+     * POST /api/orders/{orderId}/ready
+     */
+    async function markOrderAsReady() {
+        if (!state.currentOrder) return;
+        try {
+            const response = await fetch(`/api/orders/${state.currentOrder.id}/ready`, {
+                method: 'POST'
+            });
+            if (!response.ok) {
+                await handleApiError(response, 'Error al marcar como listo');
+            } else {
+                state.currentOrder = await response.json();
+                renderCart();
+                updateUIState();
+                showToast('Orden marcada. Lista para cobro.');
+            }
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al marcar orden.', true);
+        }
+    }
+
+    /**
+     * Procesa el pago de la orden.
+     * POST /api/orders/{orderId}/pay
+     */
+    async function handlePayment() {
+        const method = paymentMethodSelect.value;
+        const amountReceived = parseFloat(amountReceivedInput.value);
+        const total = state.currentOrder.total;
+
+        if (isNaN(amountReceived) || amountReceived < total) {
+            showToast('El monto recibido debe ser mayor o igual al total.', true);
+            return;
+        }
+
+        try {
+            const requestBody = {
+                cashierId: CURRENT_CASHIER_ID,
+                method: method,
+                amountReceived: amountReceived
+            };
+
+            const response = await fetch(`/api/orders/${state.currentOrder.id}/pay`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                await handleApiError(response, 'Error al procesar el pago');
+                return;
+            }
+
+            // El backend devuelve la orden pagada, que incluye el pago con el cambio
+            const paidOrder = await response.json();
+            const payment = paidOrder.payments[0]; // Asumimos un solo pago
+
+            showPaymentSuccess(payment.change);
+
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            showToast('Error de conexión al procesar el pago.', true);
+        }
+    }
+
+    // === LÓGICA DE RENDERIZADO (UI) ===
+
+    /**
+     * Renderiza los resultados de búsqueda.
+     */
+    function renderSearchResults() {
+        searchResultsContainer.innerHTML = '';
+        if (state.searchResults.length === 0) {
+            searchResultsContainer.innerHTML = '<p class="text-gray-500 text-center p-4">No se encontraron productos.</p>';
+            return;
+        }
+        state.searchResults.forEach(product => {
+            const item = document.createElement('div');
+            item.className = 'flex justify-between items-center p-3 hover:bg-indigo-100 cursor-pointer border-b border-gray-200';
+            item.innerHTML = `
+                <div>
+                    <p class="font-medium text-gray-800">${product.name}</p>
+                    <p class="text-sm text-gray-500">SKU: ${product.sku}</p>
+                </div>
+                <span class="text-lg font-semibold text-gray-700">${formatCurrency(product.price)}</span>
+            `;
+            item.onclick = () => addItemToCart(product);
+            searchResultsContainer.appendChild(item);
+        });
+    }
+
+    /**
+     * Renderiza la lista de pedidos pendientes.
+     */
+    function renderPendingOrders() {
+        pendingOrdersContainer.innerHTML = '';
+        if (state.pendingOrders.length === 0) {
+            pendingOrdersContainer.innerHTML = '<p class="text-gray-500 text-center p-4">No hay pedidos pendientes.</p>';
+            return;
+        }
+        state.pendingOrders.forEach(order => {
+            const item = document.createElement('div');
+            item.className = 'flex justify-between items-center p-3 hover:bg-yellow-100 cursor-pointer border-b border-gray-200';
+            item.innerHTML = `
+                <div>
+                    <p class="font-medium text-gray-800">${order.customerName}</p>
+                    <p class="text-sm text-gray-500">Folio: ${order.id}</p>
+                </div>
+                <span class="text-lg font-semibold text-gray-700">${formatCurrency(order.total)}</span>
+            `;
+            item.onclick = () => loadOrder(order.id);
+            pendingOrdersContainer.appendChild(item);
+        });
+    }
+
+    /**
+     * Renderiza el carrito de la orden actual.
+     */
+    function renderCart() {
+        cartItemsContainer.innerHTML = '';
+        if (!state.currentOrder || state.currentOrder.items.length === 0) {
+            cartEmptyMessage.style.display = 'block';
+            orderIdSpan.textContent = 'Folio: N/A';
+            customerNameInput.value = 'Cliente de Mostrador';
+            subtotalSpan.textContent = formatCurrency(0);
+            taxSpan.textContent = formatCurrency(0);
+            totalSpan.textContent = formatCurrency(0);
+            return;
+        }
+
+        cartEmptyMessage.style.display = 'none';
+        orderIdSpan.textContent = `Folio: ${state.currentOrder.id}`;
+        customerNameInput.value = state.currentOrder.customerName;
+
+        state.currentOrder.items.forEach(item => {
+            const itemEl = document.createElement('div');
+            itemEl.className = 'flex items-center p-3 border-b border-gray-100';
+            itemEl.innerHTML = `
+                <div class="w-1/2">
+                    <p class="font-medium text-gray-800">${item.productName}</p>
+                    <p class="text-xs text-gray-500">SKU: ${item.sku}</p>
+                    <button class="text-xs text-red-600 hover:text-red-800 font-medium" data-item-id="${item.id}">Eliminar</button>
+                </div>
+                <div class="w-1/4 text-center">
+                    <input type="number" value="${item.quantity}" class="w-20 text-center border-gray-300 rounded-md shadow-sm sm:text-sm" readonly>
+                </div>
+                <div class="w-1/4 text-right">
+                    <p class="font-semibold text-gray-800">${formatCurrency(item.totalPrice)}</p>
+                </div>
+            `;
+            itemEl.querySelector('button').onclick = () => removeItemFromCart(item.id);
+            cartItemsContainer.appendChild(itemEl);
+        });
+
+        // Actualizar totales desde el DTO
+        subtotalSpan.textContent = formatCurrency(state.currentOrder.subtotal);
+        taxSpan.textContent = formatCurrency(state.currentOrder.taxAmount);
+        totalSpan.textContent = formatCurrency(state.currentOrder.total);
+    }
+
+    /**
+     * Actualiza el estado de los botones y campos.
+     */
+    function updateUIState() {
+        const order = state.currentOrder;
+        const hasOrder = order !== null;
+        const isDraft = hasOrder && order.status === 'DRAFT';
+        const isReady = hasOrder && order.status === 'READY_TO_PAY';
+        const isPaid = hasOrder && order.status === 'PAID';
+
+        // Campos de búsqueda y cliente
+        searchInput.disabled = !isDraft && !hasOrder;
+        searchButton.disabled = !isDraft && !hasOrder;
+        customerNameInput.disabled = !isDraft;
+
+        // Botones de acción
+        newOrderButton.disabled = isDraft; // Deshabilitado si ya hay una venta DRAFT
+        readyOrderButton.disabled = !isDraft || order.items.length === 0;
+        payOrderButton.disabled = !isReady;
+    }
+
+    /**
+     * Resetea la UI a su estado inicial.
+     */
+    function resetOrder() {
+        state.currentOrder = null;
+        state.searchResults = [];
+        renderCart();
+        renderSearchResults();
+        updateUIState();
+        loadPendingOrders(); // Recargar lista de pendientes
+    }
+
+    /**
+     * Muestra el modal de pago.
+     */
+    function showPaymentModal() {
+        if (!state.currentOrder) return;
+        const total = state.currentOrder.total;
+        modalTotalSpan.textContent = formatCurrency(total);
+        amountReceivedInput.value = total; // Autocompletar con el total
+        paymentMethodSelect.value = 'EFECTIVO';
+        paymentModal.classList.remove('hidden');
+    }
+
+    /**
+     * Oculta el modal de pago.
+     */
+    function hidePaymentModal() {
+        paymentModal.classList.add('hidden');
+    }
+
+    /**
+     * Muestra el modal de éxito/cambio.
+     */
+    function showPaymentSuccess(changeAmount) {
+        hidePaymentModal();
+        changeAmountSpan.textContent = formatCurrency(changeAmount);
+        changeModal.classList.remove('hidden');
+    }
+
+    /**
+     * Cierra el modal de cambio y resetea la orden.
+     */
+    function closeChangeModal() {
+        changeModal.classList.add('hidden');
+        resetOrder();
+    }
+
+    // === INICIALIZACIÓN Y EVENT LISTENERS ===
+
+    function init() {
+        // --- Event Listeners de Búsqueda y Pedidos ---
+        searchButton.onclick = () => searchProducts(searchInput.value);
+        searchInput.onkeydown = (e) => {
+            if (e.key === 'Enter') searchProducts(searchInput.value);
+        };
+        loadPendingButton.onclick = loadPendingOrders;
+
+        // --- Event Listeners de la Orden ---
+        customerNameInput.onchange = () => {
+            if (state.currentOrder) {
+                updateCustomerName(state.currentOrder.id, customerNameInput.value);
+            }
+        };
+
+        // --- Event Listeners de Botones de Acción ---
+        newOrderButton.onclick = createNewOrder;
+        readyOrderButton.onclick = markOrderAsReady;
+        payOrderButton.onclick = showPaymentModal;
+
+        // --- Event Listeners del Modal de Pago ---
+        cancelPaymentButton.onclick = hidePaymentModal;
+        confirmPaymentButton.onclick = handlePayment;
+
+        // --- Event Listeners del Modal de Cambio ---
+        closeChangeModalButton.onclick = closeChangeModal;
+
+        // --- Carga Inicial ---
+        resetOrder(); // Inicia en estado limpio
+        showToast('Sistema de Caja listo.', false);
+    }
+
+    // Arrancar la aplicación
+    document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
